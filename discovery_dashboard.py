@@ -98,8 +98,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    import threading
+    import os, threading
+    web_port = int(os.environ.get("PORT", 8888))
     threading.Thread(target=node.start, daemon=True).start()
-    dash = HTTPServer(("0.0.0.0", 8888), Handler)
-    print("Discovery Dashboard: http://localhost:8888")
+    dash = HTTPServer(("0.0.0.0", web_port), Handler)
+    print(f"Dashboard: http://0.0.0.0:{web_port}")
     dash.serve_forever()

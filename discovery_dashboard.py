@@ -83,6 +83,29 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_response(404); self.end_headers()
 
+    def do_POST(self):
+        if self.path == "/api/announce":
+            content_len = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
+            agent = body.get("agent", {})
+            port = body.get("port", 0)
+            # Register via TCP to local node
+            from discovery_node import AgentEntry
+            import time
+            entry = AgentEntry(
+                agent_id=agent.get("agent_id", ""),
+                name=agent.get("name", ""),
+                skills=agent.get("skills", []),
+                host=self.client_address[0],
+                port=port,
+                wallet=agent.get("wallet_address", ""),
+                reputation=agent.get("reputation", 0.5),
+            )
+            node._agents[entry.agent_id] = entry
+            self._json({"status": "registered"})
+        else:
+            self.send_response(404); self.end_headers()
+
     def _html(self, h):
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")

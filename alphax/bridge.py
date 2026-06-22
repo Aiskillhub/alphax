@@ -374,22 +374,41 @@ class Bridge:
         self._server.settimeout(1)
 
     def _announce(self):
-        """Announce this agent on all discovery nodes."""
+        """Announce this agent on all discovery nodes (HTTPS or TCP)."""
+        import urllib.request, urllib.error
+
         for node in self.discovery_nodes:
-            try:
-                host, port_str = node.split(":")
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(2)
-                s.connect((host, int(port_str)))
-                s.sendall(json.dumps({
-                    "action": "announce",
-                    "agent": self.identity.to_dict(),
-                    "port": self.port,
-                }).encode() + b"\n")
-                resp = s.recv(1024)
-                s.close()
-            except Exception:
-                pass
+            # HTTPS announce (for Railway etc.)
+            if node.startswith("http"):
+                try:
+                    data = json.dumps({
+                        "agent": self.identity.to_dict(),
+                        "port": self.port,
+                    }).encode()
+                    req = urllib.request.Request(
+                        f"{node.rstrip('/')}/api/announce",
+                        data=data,
+                        headers={"Content-Type": "application/json"},
+                    )
+                    urllib.request.urlopen(req, timeout=5)
+                except Exception:
+                    pass
+            else:
+                # Raw TCP announce (for local/VPS discovery nodes)
+                try:
+                    host, port_str = node.split(":")
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(2)
+                    s.connect((host, int(port_str)))
+                    s.sendall(json.dumps({
+                        "action": "announce",
+                        "agent": self.identity.to_dict(),
+                        "port": self.port,
+                    }).encode() + b"\n")
+                    resp = s.recv(1024)
+                    s.close()
+                except Exception:
+                    pass
 
     def _run_loop(self):
         """Accept incoming connections and handle messages."""

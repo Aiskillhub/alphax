@@ -1,0 +1,16 @@
+__pycache__/
+.DS_Store
+.env
+.env.*
+.pytest_cache/
+*.key
+*.pem
+*.pyc
+*.zip
+credentials*
+data/
+data/*.json
+data/*.jsonl
+data/*.log
+data/builds/
+service-account*

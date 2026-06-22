@@ -89,11 +89,12 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(content_len)) if content_len > 0 else {}
             agent = body.get("agent", {})
             port = body.get("port", 0)
-            # Register via TCP to local node
             from discovery_node import AgentEntry
             import time
-            entry = AgentEntry(
-                agent_id=agent.get("agent_id", ""),
+            agent_id = agent.get("agent_id", "")
+            # Update existing or create new
+            node._agents[agent_id] = AgentEntry(
+                agent_id=agent_id,
                 name=agent.get("name", ""),
                 skills=agent.get("skills", []),
                 host=self.client_address[0],
@@ -101,8 +102,11 @@ class Handler(BaseHTTPRequestHandler):
                 wallet=agent.get("wallet_address", ""),
                 reputation=agent.get("reputation", 0.5),
             )
-            node._agents[entry.agent_id] = entry
             self._json({"status": "registered"})
+        elif self.path == "/api/clean":
+            # Force cleanup
+            node._cleanup()
+            self._json({"status": "cleaned"})
         else:
             self.send_response(404); self.end_headers()
 

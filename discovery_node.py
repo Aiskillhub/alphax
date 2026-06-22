@@ -158,7 +158,7 @@ class DiscoveryNode:
         now = time.time()
         with self._lock:
             stale = [aid for aid, a in self._agents.items()
-                     if now - a.last_seen > 300]  # 5 min timeout
+                     if now - a.last_seen > 60]  # 5 min timeout
             for aid in stale:
                 del self._agents[aid]
             if stale:

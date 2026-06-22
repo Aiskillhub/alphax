@@ -128,4 +128,5 @@ class AlphaXError(Exception):
 # ── A2A Agent SDK ──
 from .agent import Agent, quick_start  # noqa: E402, F401
 from .bridge import Bridge   # noqa: E402, F401
+from .evolve_bridge import EvolvingBridge  # noqa: E402, F401
 

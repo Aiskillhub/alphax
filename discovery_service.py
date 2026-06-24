@@ -198,9 +198,23 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_response(404); self.end_headers()
 
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
-        body = json.loads(self.rfile.read(length)) if length else {}
+        if length == 0:
+            self._json({"error": "empty body"}, 400)
+            return
+        try:
+            body = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError:
+            self._json({"error": "invalid json"}, 400)
+            return
         path = urlparse(self.path).path
 
         if path == "/api/register":

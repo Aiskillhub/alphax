@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { SparkIcon, TrophyIcon, DownloadIcon, ArrowLeftIcon } from "../icons";
 
-const API = "http://localhost:8000";
+import { API } from "../config";
 
 export default function ProductPage() {
   const [desc, setDesc] = useState("");

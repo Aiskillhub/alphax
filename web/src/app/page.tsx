@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { SparkIcon, AgentIcon, ChevronIcon } from "./icons";
 
-const API = "http://localhost:8000";
+import { API } from "./config";
 
 function ParticleField() {
   const canvas = useRef<HTMLCanvasElement>(null);

@@ -471,7 +471,7 @@ function panelHtml(title,cls,obj,raw){var h='<div class="panel"><div class="pane
   h+='<table class="claims-table">';for(var k in obj){h+='<tr><th>'+escHtml(k)+'</th><td>';var v=obj[k];if(typeof v==='number'){if(k==='exp'||k==='iat'||k==='nbf'){v=new Date(v*1000).toLocaleString();h+='<code>'+v+'</code>'}else{h+='<code>'+v+'</code>'}}else if(typeof v==='boolean'){h+='<span class="json-bool">'+v+'</span>'}else{h+='<span>'+escHtml(String(v))+'</span>'}h+='</td></tr>'}
   h+='</table><div style="margin-top:12px;font-size:10px;color:var(--muted);word-break:break-all">Raw: '+escHtml(raw)+'</div></div></div>';return h}
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function loadSample(){document.getElementById('jwt').value='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE4OTM0NTYwMDAsImFkbWluIjp0cnVlLCJyb2xlcyI6WyJ1c2VyIiwiZWRpdG9yIl19.4EuVjxBqXKgUrIuW9C0YOFsGqPZkmJLBHmgfQ7NLK8o';decode()}
+function loadSample(){document.getElementById('jwt').value='PASTE_YOUR_JWT_HERE';decode()}
 </script>""")
 
 

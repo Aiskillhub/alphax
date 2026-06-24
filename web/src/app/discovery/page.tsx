@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { AgentIcon, NetworkIcon, CheckIcon, ArrowLeftIcon } from "../icons";
 
-const API = "http://localhost:8000";
+import { API } from "../config";
 
 export default function DiscoveryPage() {
   const [agents, setAgents] = useState<any[]>([]);

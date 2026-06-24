@@ -32,7 +32,6 @@ from intent_parser import IntentParser
 from judge import Judge
 from arena_models import ArenaTask
 from market_brain import MarketBrain
-from job_scout import JobScout, OUR_CAPABILITIES
 from evolution_lineage import mutation_memory, lineage
 
 
@@ -76,7 +75,6 @@ class AutonomousEntity:
         self.iterator = ProductIterator()
         self.parser = IntentParser()
         self.market = MarketBrain()
-        self.scout = JobScout()
 
         # Publishers
         self.gumroad = GumroadPublisher()
@@ -141,9 +139,6 @@ class AutonomousEntity:
 
             # 7. 学习：记住什么基因组合好卖
             self._learn_patterns()
-
-            # 8. 接单：扫描自由职业平台，找能做的活
-            self._hunt_gigs()
 
             # 保存
             self._save_products()
@@ -434,26 +429,6 @@ JSON:"""
                 self.products = {k: Product(**v) for k, v in data.items()}
             except Exception:
                 pass
-
-    def _hunt_gigs(self):
-        """接单模式：扫描自由职业平台，找需求 → 写报价。"""
-        gigs = self.scout.scan()
-        if not gigs:
-            return
-
-        matched = self.scout.match(gigs, min_score=0.4)
-        if not matched:
-            return
-
-        self._log(f"   🎯 接单: 发现 {len(gigs)} 条需求，匹配 {len(matched)} 条")
-
-        for gig in matched[:2]:
-            proposal = self.scout.draft(gig)
-            if proposal:
-                skill = OUR_CAPABILITIES.get(gig.matched_skill, {})
-                self._log(f"      📝 {gig.title[:50]}...")
-                self._log(f"         报价: ${proposal.price:.0f} | {skill.get('title', 'N/A')}")
-                self._log(f"         → 已保存: proposals/{proposal.gig_id}.json（审核后发送）")
 
     def _save_products(self):
         PRODUCTS_PATH.write_text(json.dumps(

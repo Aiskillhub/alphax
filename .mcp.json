@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "alphax-bridge": {
+      "command": "python3",
+      "args": ["mcp_bridge.py", "--port", "9101", "--name", "AlphaX Bridge Agent", "--skills", "code-review,web_tool_builder,chrome_extension_builder,prompt_library_builder"],
+      "cwd": "/Users/liao/alphax"
+    }
+  }
+}

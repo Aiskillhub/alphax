@@ -547,6 +547,8 @@ header .brand{{font-size:12px;color:var(--muted)}}
 
 # ── Builder ──
 
+_llm_generator = object()  # LLM 生成器哨兵
+
 class WebToolBuilder:
     """生成有真实功能的 Web 工具"""
 
@@ -556,6 +558,17 @@ class WebToolBuilder:
         self._build_dir.mkdir(parents=True, exist_ok=True)
         work_dir = self._build_dir / f"webtool_{organism_id}"
         work_dir.mkdir(exist_ok=True)
+
+        # Check for custom request → use LLM to generate
+        custom = genome.extra.get("custom_request", "") if genome.extra else ""
+        if custom:
+            html = self._llm_generate_tool(custom, organism_id, genome)
+            if html:
+                meta = self._resolve_meta(genome, organism_id, _llm_generator)
+                (work_dir / "index.html").write_text(html)
+                (work_dir / "listing.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
+                (work_dir / "HOW_TO_USE.md").write_text(f"# {genome.express()}\n\n{custom}\n")
+                return self._zip(work_dir, organism_id)
 
         # Pick tool type from category, with variety
         import hashlib
@@ -603,7 +616,114 @@ Built by Alpha X | {genome.express()}
 
         return zip_path
 
+    def _llm_generate_tool(self, request: str, organism_id: str, genome: Genome) -> str | None:
+        """使用 LLM 根据需求生成完整的 Web 工具 HTML。"""
+        from config import config
+        from core.api_utils import call_deepseek
+        if not config.has_llm:
+            return None
+        try:
+            prompt = f"""你是一个资深前端工程师。根据用户需求生成一个完整的、可用的网页工具。
+
+## 用户需求
+{request}
+
+## 产品名称
+{genome.express()}
+
+## 硬性要求（必须遵守）
+- 完整的 HTML 单文件（内嵌 CSS + JS）
+- 暗色主题，现代 UI，响应式
+- 所有功能必须完整可用，不只是 UI 壳
+- JS 变量命名一致，不要同一个变量有多个名字
+- 初始化代码必须完整，确保页面加载后能直接使用
+- 不需要任何外部依赖
+- 不需要任何解释文字，只输出代码
+
+## 输出
+完整的 HTML 代码（从 <!DOCTYPE html> 开始）:"""
+
+            html = call_deepseek(
+                prompt, config.deepseek_api_key, config.deepseek_base_url,
+                temperature=0.3, max_tokens=10000, timeout=90,
+            )
+            # 清理 LLM 输出
+            html = html.strip()
+            if html.startswith("```"):
+                html = html.split("```", 2)[1]
+                if html.startswith("html"):
+                    html = html[4:]
+                html = html.strip()
+            if not html.lower().startswith("<!doctype"):
+                return None
+            return html.strip()
+        except Exception:
+            return None
+
+    def _self_review(self, html: str, request: str) -> str | None:
+        """Agent 自审：检查自己生成的代码，发现 bug 自动修。"""
+        from config import config
+        from core.api_utils import call_deepseek
+        if not config.has_llm:
+            return None
+        try:
+            # 只审前 8000 字符，避免超 token
+            snippet = html[:8000]
+            prompt = f"""你是严格的前端代码审查员。审查以下代码，找出所有问题并修复。
+
+## 原始需求
+{request}
+
+## 需要审查的代码
+```html
+{snippet}
+```
+
+## 审查要点
+1. 功能是否完整实现了需求
+2. 有无 JS 逻辑错误（变量未定义、计时器未清理、边界条件）
+3. UI 是否有明显问题（按钮不可点、颜色看不清、移动端崩）
+4. 是否缺关键功能
+
+## 输出
+输出修复后的完整 HTML 代码（从 <!DOCTYPE html> 开始）。
+如果代码已经很好没有明显问题，原样返回。
+
+HTML:"""
+
+            fixed = call_deepseek(
+                prompt, config.deepseek_api_key, config.deepseek_base_url,
+                temperature=0.1, max_tokens=6000, timeout=60,
+            )
+            fixed = fixed.strip()
+            if fixed.startswith("```"):
+                fixed = fixed.split("```", 2)[1]
+                if fixed.startswith("html"):
+                    fixed = fixed[4:]
+                fixed = fixed.strip()
+            if fixed.lower().startswith("<!doctype") and len(fixed) > 500:
+                return fixed
+            return None
+        except Exception:
+            return None
+
+    def _zip(self, work_dir: Path, organism_id: str) -> Path:
+        zip_path = self._build_dir / f"{organism_id}_webtool.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in work_dir.iterdir():
+                zf.write(f, f.name)
+        return zip_path
+
     def _resolve_meta(self, genome: Genome, organism_id: str, generator) -> dict:
+        if generator is _llm_generator:
+            name = genome.express()
+            return {
+                "title": name,
+                "subtitle": genome.extra.get("custom_request", "")[:80] if genome.extra else "",
+                "price": genome.price_point,
+                "category": genome.category.value,
+                "id": organism_id,
+            }
         tool_key = [k[1] for k, v in TOOL_GENERATORS.items() if v is generator][0]
         tool_meta = _TOOL_META[tool_key]
         name = _resolve_name(genome, tool_meta["name"], tool_meta["name"])

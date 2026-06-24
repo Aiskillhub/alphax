@@ -156,8 +156,15 @@ class Genome:
             return 0.5
         return self.times_succeeded / self.times_used
 
-    def mutate(self, rate: float = 0.10) -> Genome:
-        """产生变异后代——每个位点有概率变异"""
+    def mutate(self, rate: float = 0.10, use_smart: bool = True) -> Genome:
+        """产生变异后代——每个位点有概率变异。
+
+        如果 use_smart=True，变异率基于历史成功率动态调整：
+        - 历史上该位点变异导致 fitness 提升 → 提高变异率
+        - 历史上该位点变异导致 fitness 下降 → 降低变异率
+        """
+        from evolution_lineage import mutation_memory, lineage
+
         child = copy.deepcopy(self)
         child.generation += 1
         child.parent_id = self.genome_id
@@ -167,37 +174,37 @@ class Genome:
         child.times_used = 0
         child.times_succeeded = 0
 
+        product_type = self.product_type.value
+
         for field, options in GENE_SPACE.items():
-            if random.random() >= rate:
+            # 智能变异率
+            field_rate = rate
+            if use_smart:
+                field_rate = mutation_memory.smart_rate(field, product_type)
+
+            if random.random() >= field_rate:
                 continue
 
-            if field == "llm_backend":
-                old = child.llm_backend
-                new = random.choice([o for o in options if o != old])
-                child.llm_backend = new
-                child.mutations.append(Mutation(field, old, new))
+            old = getattr(child, field, None)
 
-            elif field == "design_style":
-                old = child.design_style
+            if field in ("llm_backend", "design_style", "prompt_strategy",
+                         "target_audience"):
+                old = getattr(child, field)
                 new = random.choice([o for o in options if o != old])
-                child.design_style = new
-                child.mutations.append(Mutation(field, old, new))
-
-            elif field == "prompt_strategy":
-                old = child.prompt_strategy
-                new = random.choice([o for o in options if o != old])
-                child.prompt_strategy = new
-                child.mutations.append(Mutation(field, old, new))
-
-            elif field == "target_audience":
-                old = child.target_audience
-                new = random.choice([o for o in options if o != old])
-                child.target_audience = new
+                setattr(child, field, new)
                 child.mutations.append(Mutation(field, old, new))
 
             elif field in ("price_point", "screenshot_count"):
                 old = getattr(child, field)
-                factor = 1 + random.uniform(-0.25, 0.25)
+                # 智能方向：历史成功的加/减方向
+                direction = mutation_memory.suggest_direction(field, product_type)
+                if direction == "increase":
+                    factor = 1 + random.uniform(0.05, 0.25)
+                elif direction == "decrease":
+                    factor = 1 - random.uniform(0.05, 0.25)
+                else:
+                    factor = 1 + random.uniform(-0.25, 0.25)
+
                 if field == "price_point":
                     new = round(old * factor, 2)
                     new = max(0.99, min(99.99, new))
@@ -222,6 +229,15 @@ class Genome:
                 new = random.choice([o for o in options if o != old])
                 setattr(child, field, new)
                 child.mutations.append(Mutation(field, old, new))
+
+        # 注册血统
+        if child.mutations:
+            lineage.register(
+                child.genome_id,
+                parent_id=self.genome_id,
+                fitness=child.fitness_score,
+                generation=child.generation,
+            )
 
         return child
 

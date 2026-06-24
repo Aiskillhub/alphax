@@ -33,6 +33,10 @@ class Config:
     deepseek_base_url: str = field(default_factory=lambda: os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
     deepseek_model: str = field(default_factory=lambda: os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"))
 
+    # FreeLLMAPI 聚合代理（可选，设置后优先走代理，省 token 费）
+    freellmapi_url: str = field(default_factory=lambda: os.environ.get("FREELMAPI_URL", ""))
+    freellmapi_key: str = field(default_factory=lambda: os.environ.get("FREELMAPI_KEY", ""))
+
     @property
     def has_llm(self) -> bool:
         return bool(self.deepseek_api_key)

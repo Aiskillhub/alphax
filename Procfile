@@ -1,1 +1,1 @@
-web: python3 discovery_dashboard.py
+web: python3 discovery_service.py --port $PORT

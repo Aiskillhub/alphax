@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from capital.wallet import WalletManager, _generate_private_key, _derive_address
+from dht import DHTNode, Peer as DHTPeer
 
 
 # ── Protocol Messages ──
@@ -146,9 +147,11 @@ class Bridge:
         self,
         name: str,
         skills: list[str] = None,
-        port: int = 0,  # 0 = auto-assign
+        port: int = 0,
         discovery_nodes: list[str] = None,
-        handler: Optional[Callable] = None,  # Your work handler: handler(task) -> result
+        bootstrap_peers: list[tuple[str, int]] = None,
+        dht_port: int = 0,
+        handler: Optional[Callable] = None,
     ):
         self.identity = AgentIdentity(
             agent_id=secrets.token_hex(8),
@@ -160,8 +163,16 @@ class Bridge:
         self.identity.wallet_address = _derive_address(self.identity.private_key)
 
         self.port = port or self._find_port()
-        self.discovery_nodes = discovery_nodes or ["localhost:9999"]
+        self.discovery_nodes = discovery_nodes or []
         self.handler = handler
+
+        # DHT: 去中心化发现
+        self.dht = DHTNode(
+            node_id=self.identity.agent_id,
+            port=dht_port,
+            skills=skills or [],
+            bootstrap_peers=bootstrap_peers or [],
+        )
 
         self._peers: dict[str, PeerConnection] = {}
         self._server: Optional[socket.socket] = None
@@ -178,14 +189,16 @@ class Bridge:
     # ── Lifecycle ──
 
     def start(self):
-        """Start the bridge. Agent is now online and discoverable."""
+        """Start the bridge. Agent joins DHT and is discoverable."""
         self._running = True
         self._start_server()
+        self.dht.extra = {"bridge_port": self.port}
+        self.dht.start()
         self._announce()
         print(f"[Bridge] 🟢 {self.identity.name} online (port {self.port})")
         print(f"[Bridge]    ID: {self.identity.agent_id[:12]}...")
         print(f"[Bridge]    Skills: {self.identity.skills}")
-        print(f"[Bridge]    Wallet: {self.identity.wallet_address[:16]}...")
+        print(f"[Bridge]    DHT: {self.dht.peer_count} peers in routing table")
         self._run_loop()
 
     def start_async(self):
@@ -208,10 +221,25 @@ class Bridge:
     # ── Discovery ──
 
     def discover(self, skill: str = "") -> list[dict]:
-        """Find agents by skill via discovery nodes + LAN broadcast."""
+        """Find agents by skill via DHT + discovery nodes."""
         found = []
 
-        # 1. LAN broadcast
+        # 1. DHT: 去中心化查询
+        dht_peers = self.dht.discover(skill)
+        my_ip = self.dht._local_ip()
+        for peer in dht_peers:
+            if peer.node_id == self.identity.agent_id:
+                continue  # 不发现自己
+            info = peer.to_dict()
+            bridge_port = peer.extra.get("bridge_port", peer.port)
+            info["port"] = bridge_port
+            host = peer.host
+            if host == my_ip or host.startswith("172.") or host.startswith("192.168."):
+                host = "127.0.0.1"
+            info["host"] = host
+            found.append(info)
+
+        # 2. Legacy: discovery nodes（backward compat）
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)

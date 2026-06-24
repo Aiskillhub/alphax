@@ -46,6 +46,11 @@ class DiscoveryService:
     def __init__(self):
         self._agents: dict[str, AgentListing] = {}
         self._data = Path(__file__).parent / "data" / "discovery.json"
+        # 使用统计
+        self._queries_total = 0
+        self._queries_today = 0
+        self._registers_total = 0
+        self._last_reset = time.time()
         self._load()
 
     # ── Agent 注册 ──
@@ -65,6 +70,8 @@ class DiscoveryService:
     # ── 查询（按付费优先级排序）──
 
     def discover(self, skill: str = "", limit: int = 10) -> list[dict]:
+        self._queries_total += 1
+        self._queries_today += 1
         results = []
         for agent in self._agents.values():
             if time.time() - agent.last_seen > 300:  # 5分钟没心跳=离线
@@ -95,10 +102,17 @@ class DiscoveryService:
         tiers = {"free": 0, "pro": 0, "enterprise": 0}
         for a in self._agents.values():
             tiers[a.tier] = tiers.get(a.tier, 0) + 1
+        # 每天重置今日计数
+        if time.time() - self._last_reset > 86400:
+            self._queries_today = 0
+            self._last_reset = time.time()
         return {
             "total_agents": len(self._agents),
             "by_tier": tiers,
             "mrr": tiers["pro"] * 5 + tiers["enterprise"] * 49,
+            "queries_total": self._queries_total,
+            "queries_today": self._queries_today,
+            "registers_total": self._registers_total,
         }
 
     def _save(self):
